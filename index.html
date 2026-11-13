@@ -49,6 +49,12 @@
   @keyframes fade{to{opacity:1}}
   @keyframes fadeDot{to{opacity:.6}}
   @keyframes load{to{width:100%}}
+  body.waiting *{animation-play-state:paused!important}
+  #tap{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:#000;color:#FFE3A3;border:0;font:inherit;font-size:18px;font-weight:700;cursor:pointer;z-index:5}
+  #tap svg{animation:pulse 1.4s ease-in-out infinite!important;animation-play-state:running!important}
+  #tap span{animation:pulse 1.4s ease-in-out infinite!important;animation-play-state:running!important}
+  body.waiting #tap{display:flex}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.94);opacity:.75}}
   body.leave{animation:out .3s ease-in forwards}
   @keyframes out{to{opacity:0;transform:scale(1.04)}}
 
@@ -103,6 +109,7 @@
   <a id="go" href="https://claude.ai/artifact/2aPoWGmch6BX37gqm2asst">Buka One Step Ahead</a>
   <button id="install" type="button" hidden>Pasang sebagai aplikasi</button>
 </div>
+<button id="tap" type="button" aria-label="Ketuk untuk mulai dengan musik"><svg viewBox="10 12 44 40" width="110" height="100" aria-hidden="true"><path d="M32 15L37.3 26.7L50.1 28.1L40.6 36.8L43.2 49.4L32 43L20.8 49.4L23.4 36.8L13.9 28.1L26.7 26.7Z" fill="#F0B33C" stroke="#F0B33C" stroke-width="5" stroke-linejoin="round"/><path d="M32 17.5L36.4 27.4L47.2 28.6L39.2 35.9L41.4 46.5L32 41.1L22.6 46.5L24.8 35.9L16.8 28.6L27.6 27.4Z" fill="#F7C454"/><ellipse cx="28" cy="33.2" rx="1.75" ry="2.4" fill="#2A1C00"/><path d="M34.2 33.6Q36 31.6 37.8 33.6" fill="none" stroke="#2A1C00" stroke-width="1.5" stroke-linecap="round"/><path d="M29 37.3Q32 41.2 35 37.3Z" fill="#2A1C00"/></svg><span>Ketuk untuk mulai</span></button>
 <script>
   var APP = "https://claude.ai/artifact/2aPoWGmch6BX37gqm2asst";
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
@@ -111,10 +118,7 @@
   var deferred = null, btn = document.getElementById("install"), msg = document.getElementById("msg");
 
   /* Musik pembuka dibuat langsung dengan Web Audio, tanpa file lagu. Waktunya mengikuti animasi. */
-  function jingle() {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    var ac = new AC();
+  function jingle(ac) {
     var play = function () {
       var t0 = ac.currentTime + 0.05;
       var master = ac.createGain(); master.gain.value = 0.85; master.connect(ac.destination);
@@ -150,18 +154,39 @@
       [523.25, 659.25, 783.99, 1046.5].forEach(function (f) { tone(f, 1.1, 1.3, "triangle", 0.11); }); /* akor penutup */
       tone(2093, 1.25, 0.9, "sine", 0.06);
     };
-    if (ac.state === "suspended") ac.resume().then(function () { if (ac.state === "running") play(); }).catch(function () {});
-    else play();
+    play();
     return ac;
+  }
+  /* Coba nyalakan suara tanpa sentuhan. Kalau browser menolak dalam 350 ms, minta satu ketukan. */
+  function audioReady(ac) {
+    if (!ac) return Promise.resolve(false);
+    if (ac.state === "running") return Promise.resolve(true);
+    return Promise.race([
+      ac.resume().then(function () { return ac.state === "running"; }, function () { return false; }),
+      new Promise(function (r) { setTimeout(function () { r(false); }, 350); })
+    ]);
   }
   /* Dibuka dari ikon: animasi main sebentar, lalu masuk ke aplikasi. Ketuk layar untuk lewati. */
   if (standalone) {
-    document.body.classList.add("standalone");
-    try { jingle(); } catch (e) {}
-    var gone = false;
-    var go = function () { if (gone) return; gone = true; document.body.classList.add("leave"); setTimeout(function () { location.replace(APP); }, reduce ? 0 : 280); };
-    setTimeout(go, reduce ? 300 : 2300);
-    addEventListener("pointerdown", go);
+    var b = document.body, tap = document.getElementById("tap");
+    b.classList.add("standalone", "waiting");
+    var AC = window.AudioContext || window.webkitAudioContext, ac = null;
+    try { ac = AC ? new AC() : null; } catch (e) {}
+    var gone = false, started = false;
+    var go = function () { if (gone) return; gone = true; b.classList.add("leave"); setTimeout(function () { location.replace(APP); }, reduce ? 0 : 280); };
+    var start = function () {
+      if (started) return; started = true;
+      b.classList.remove("waiting");
+      try { if (ac && ac.state === "running") jingle(ac); } catch (e) {}
+      setTimeout(go, reduce ? 300 : 2400);
+      setTimeout(function () { addEventListener("pointerdown", go); }, 400);
+    };
+    tap.addEventListener("click", function () {
+      if (!ac) return start();
+      var p = ac.resume ? ac.resume() : Promise.resolve();
+      p.then(start, start);
+    });
+    audioReady(ac).then(function (ok) { if (ok || !ac) start(); else tap.focus(); });
   }
   addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; btn.hidden = false; });
   btn.addEventListener("click", function () { if (!deferred) return; deferred.prompt(); deferred.userChoice.finally(function () { deferred = null; btn.hidden = true; }); });
