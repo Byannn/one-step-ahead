@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>One Step Ahead</title>
+<meta name="theme-color" content="#1B2048">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  html,body{height:100%;margin:0}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#1B2048;color:#FFE3A3;
+    font:600 16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-align:center;padding:24px;box-sizing:border-box}
+  img{width:120px;height:120px;border-radius:28px}
+  a{color:#1B2048;background:#F0B33C;text-decoration:none;padding:12px 22px;border-radius:14px;font-weight:700;min-height:44px;box-sizing:border-box}
+  p{margin:0;max-width:300px;color:#D9DCF2;font-weight:500}
+  #install[hidden]{display:none}
+  #install{color:#FFE3A3;background:transparent;border:1px solid #F0B33C;padding:11px 20px;border-radius:14px;font:inherit;font-weight:700;min-height:44px}
+</style>
+</head>
+<body>
+<img src="icon-512.png" alt="Logo One Step Ahead">
+<p id="msg">Membuka One Step Ahead…</p>
+<a id="go" href="https://claude.ai/artifact/2aPoWGmch6BX37gqm2asst">Buka One Step Ahead</a>
+<button id="install" type="button" hidden>Pasang sebagai aplikasi</button>
+<script>
+  var APP = "https://claude.ai/artifact/2aPoWGmch6BX37gqm2asst";
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function () {});
+  var standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  var deferred = null, btn = document.getElementById("install"), msg = document.getElementById("msg");
+  /* Dibuka dari ikon di layar utama: langsung ke aplikasi. Dibuka di browser biasa: tampilkan tombol pasang dulu. */
+  if (standalone) { location.replace(APP); }
+  else { msg.textContent = "Pasang halaman ini supaya ikon One Step Ahead muncul di layar utama HP."; }
+  addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; btn.hidden = false; });
+  btn.addEventListener("click", function () { if (!deferred) return; deferred.prompt(); deferred.userChoice.finally(function () { deferred = null; btn.hidden = true; }); });
+  addEventListener("appinstalled", function () { msg.textContent = "Terpasang. Buka dari ikon One Step Ahead di layar utama."; btn.hidden = true; });
+</script>
+</body>
+</html>
